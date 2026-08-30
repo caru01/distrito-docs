@@ -10,24 +10,32 @@ frontend, backend y base de datos realizada en agosto de 2026.
 - [Decisiones de arquitectura](../distrito-api/ARCHITECTURE.md)
 - [Tienda pública](../distrito-web/README.md)
 - [Panel administrativo](../distrito-admin/README.md)
-- [PWA de domiciliarios](../Distrito-delivery/README.md)
+- [Delivery PWA y Android](../distrito-delivery/README.md)
+- [Release Android y validación de producción](ANDROID_RELEASE_2026-08-09.md)
 - [Componentes compartidos](../distrito-shared/README.md)
+- [Auditoría funcional Admin y Delivery — 9 de agosto de 2026](AUDITORIA_FUNCIONAL_2026-08-09.md)
+- [Entregas propias y operadores externos](ENTREGAS_EXTERNAS.md)
+- [Implementación profesional de Delivery — 9 de agosto de 2026](DELIVERY_PRODUCTION_2026-08-09.md)
+- [CRM y WhatsApp oficial — 9 de agosto de 2026](CRM_WHATSAPP_2026-08-09.md)
 
 ## Estado de referencia
 
 | Indicador | Estado validado |
 | --- | --- |
-| Migraciones aplicadas | 10 |
-| Tests de API y contratos | 21 aprobados |
-| Pedidos existentes | 214 |
+| Migraciones aplicadas | 22 |
+| Tests de API y contratos | 45 aprobados |
+| Pedidos existentes | 235 |
+| Contactos CRM canónicos | 146; 0 opt-in inferidos |
+| Pedidos vinculados al CRM | 222; 13 teléfonos inválidos preservados |
 | Carrito promedio | Aproximadamente 160 bytes |
 | Tamaño de pedidos | Aproximadamente 1.6 MB |
 | Tamaño de tablas de aplicación | Aproximadamente 25 MB |
 | Índices operativos agregados | 17 |
-| Permisos definidos | 68 |
-| Build tienda | Aprobado, 192 KB JS sin comprimir |
-| Build administración | Aprobado, 189 KB JS inicial; módulos diferidos aparte |
-| Build Delivery | Aprobado, 169 KB JS inicial; módulos diferidos aparte |
+| Permisos definidos | 85 |
+| Build tienda | Aprobado |
+| Build administración | Aprobado; módulos diferidos por ruta |
+| Build Delivery | Aprobado; módulos diferidos por ruta |
+| Build Android Delivery | `testDebugUnitTest` y `assembleDebug` aprobados |
 
 Estas cifras describen la base configurada durante la intervención. Pueden cambiar a
 medida que se creen nuevos pedidos, productos, inventario y auditorías.
@@ -56,8 +64,8 @@ medida que se creen nuevos pedidos, productos, inventario y auditorías.
 - Administración de dispositivos propios desde Perfil.
 - Usuarios, roles y matriz de permisos conectados a PostgreSQL.
 - Temas separados para tienda y administración, publicados desde Configuración.
-- PWA Delivery sobre el JWT y la API existentes, con aceptación atómica, GPS solo
-  en ruta, notificaciones push, historial, estadísticas y dispositivos.
+- Delivery sobre el JWT y la API existentes, con aceptación atómica, turnos,
+  heartbeat, dispositivo GPS oficial, notificaciones, historial y estadísticas.
 - Mapa de Domicilios en el ERP y ubicación en vivo en el seguimiento del cliente.
 - Un único `LiveDeliveryMap` compartido muestra sede, destinos y motocicletas con
   nombre tanto al cliente como al administrador; SSE actualiza los marcadores.
@@ -72,8 +80,9 @@ medida que se creen nuevos pedidos, productos, inventario y auditorías.
   para pedidos históricos que solo tienen dirección escrita.
 - Enlace temporal firmado en WhatsApp, mapa público del domiciliario y caducidad
   posterior a la entrega sin exponer el teléfono en la URL.
-- Flujo de cocina y reparto alineado: preparar imprime, listo publica, aceptar
-  inicia `En camino` y entregar fija la duración visible en administración.
+- Flujo de cocina y reparto alineado: preparar imprime, listo publica, aceptar deja
+  el pedido comprometido, iniciar recorrido cambia a `En camino` y entregar fija la
+  duración visible en administración.
 - Tienda y Tomar pedido usan una única implementación de Places/mapa/marcador; la
   edición administrativa persiste el mismo destino exacto y datos complementarios.
 - Checkout protegido contra pantallas blancas: React renderiza el campo y la lista
@@ -81,12 +90,35 @@ medida que se creen nuevos pedidos, productos, inventario y auditorías.
 - Delivery sin caducidad por inactividad para roles de reparto, con renovación de
   token, alertas sonoras/visuales, scroll táctil basado en `100dvh` y recuperación
   explícita ante errores de interfaz.
-- Finalización de entrega independiente de la disponibilidad del GPS; el recorrido
-  se transmite solo desde un contexto HTTPS/localhost con permiso de ubicación.
+- Finalización con geocerca autoritativa: la API valida vigencia, precisión y radio;
+  una excepción administrativa exige permiso, motivo y auditoría.
 - Onboarding inicial de Delivery para instalación, GPS y sonido, con seguimiento
   global de todos los pedidos activos desde cualquier módulo de la PWA.
 - El detalle administrativo se cierra después de confirmar preparar, listo,
   entregar, pendiente de pago o cancelar.
+- El costo del domicilio configurado se suma transaccionalmente al subtotal en web
+  y toma manual; tickets, WhatsApp y reportes consumen el total confirmado.
+- Los mensajes domicilio/recogida, los estados visibles y la codificación UTF-8 de
+  WhatsApp viven en `distrito-shared`.
+- Configuración administra idioma y estilo de voz. Admin anuncia cada checkout y
+  Delivery anuncia pedido disponible, aceptación y entrega con el mismo motor.
+- La hora manual y las vistas operativas se interpretan con `America/Bogota`, sin
+  depender de la zona del computador o del proceso Node.
+- La preparación de Delivery persiste instalación, GPS y sonido; la recuperación
+  de interfaz permite volver a Pedidos o cerrar sesión sin borrar cookies.
+- Servicio Android `Foreground Service` con cola SQLite, recuperación tras cerrar
+  la interfaz y token GPS limitado protegido mediante Android Keystore.
+- Modos GPS `OFF/FREE/DELIVERY`, puntos normalizados por conductor/dispositivo y
+  cálculo de kilómetros sin multiplicar una lectura por cada pedido simultáneo.
+- Outbox transaccional, cursor incremental por instancia y `LISTEN/NOTIFY` como
+  acelerador para SSE multiinstancia, replay y resincronización REST.
+- Pruebas reales de concurrencia para aceptación, capacidad, reserva Admin,
+  idempotencia y duplicados GPS.
+- CRM canónico E.164 enlazado a Clientes y Pedidos sin borrar duplicados históricos.
+- Webhook oficial de WhatsApp firmado e idempotente, Inbox, salida encolada y
+  estados enviado/entregado/leído/fallido resistentes a eventos atrasados.
+- Segmentos parametrizados, consentimiento, frequency cap, campañas, atribución,
+  automatizaciones, reportes y permisos CRM por acción.
 
 ## Próximas mejoras recomendadas
 
@@ -96,11 +128,12 @@ medida que se creen nuevos pedidos, productos, inventario y auditorías.
   contratos automatizados.
 - Incorporar pruebas HTTP de autenticación, checkout e inventario sobre una base de
   integración aislada.
-- Planificar la migración de React Router 6 después de validar la rama 7 y sus
-  dependencias.
-- Completar el módulo visual de Clientes y notificaciones de cambios de estado.
-- Para escalar la API a varias instancias, propagar SSE mediante PostgreSQL
-  `LISTEN/NOTIFY` o Redis y mover evidencias fotográficas a almacenamiento de objetos.
+- Completar la autorización fina por permiso en todas las rutas administrativas.
+- Reemplazar la paginación visual de Pedidos por paginación real en servidor.
+- Mover evidencias fotográficas a almacenamiento de objetos cuando el volumen y la
+  política de retención lo justifiquen.
+- Añadir métricas centralizadas y alertas de SLO para latencia, outbox retrasado,
+  GPS desactualizado y errores por transición.
 - Automatizar `check`, tests, builds y migraciones en CI/CD.
 
 ## Cómo documentar cambios futuros
